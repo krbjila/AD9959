@@ -45,9 +45,9 @@ entity dds3_ad9959 is
 	 
 				CLK10 : in  STD_LOGIC; --10 MHz from OK VCO
 			  
-				sclk_out, IOUPDATE, SDIO : out  STD_LOGIC_VECTOR(2 downto 0);
-				CSB : out STD_LOGIC_VECTOR(2 downto 0) := "111";
-				LED : out STD_LOGIC_VECTOR(7 downto 0) := "11111111"
+				sclk_out, IOUPDATE, SDIO : inout  STD_LOGIC_VECTOR(2 downto 0);
+				CSB : inout STD_LOGIC_VECTOR(2 downto 0) := "111";
+				LED : inout STD_LOGIC_VECTOR(7 downto 0) := "11111111"
 				);
 	 
 	 
@@ -74,6 +74,27 @@ architecture Behavioral of dds3_ad9959 is
 	signal SCLK : std_logic_vector(2 downto 0);
 	signal sclk_inv : std_logic_vector(2 downto 0);
 	
+	signal sclk_r, ioupdate_r, sdio_r : STD_LOGIC_VECTOR(2 downto 0);
+	signal csb_r : STD_LOGIC_VECTOR(2 downto 0) := "111";
+	signal led_r : STD_LOGIC_VECTOR(7 downto 0) := "11111111";
+	
+	-- fsm --
+	type state_type is (idle, load, writing, updating);
+	signal pr_state, nx_state : state_type := idle;
+	
+	signal ready, ready_r : std_logic;
+	signal current_dds, current_dds_r : integer range 0 to 2 := 0;
+	signal data, data_r : std_logic_vector (87 downto 0) := (others => '0');
+	
+	signal counter, counter_r : integer range -1 to 87 := 87;
+	signal iocycle, iocycle_r : integer range 0 to 40 := 40;
+	signal data_set, data_set_r : std_logic := '0';
+	
+	-- constants for DDS communication --
+	constant CSR : std_logic_vector (7 downto 0) := "00000000";
+	constant FR1 : std_logic_vector (7 downto 0) := "00000001";
+	constant CFTW0 : std_logic_vector (7 downto 0) := "00000100";
+	
 	component synchronizer is
 	generic (
 		N_BITS : integer
@@ -87,99 +108,185 @@ architecture Behavioral of dds3_ad9959 is
 	end component;
 
 begin
-
-   BUFG_inst : BUFG
-   port map (
-      O => SYSCLK, -- 1-bit output: Clock buffer output
-      I => CLK10  -- 1-bit input: Clock buffer input
-   );
-
 	sclk_inv <= not sclk;
 	
-process (SYSCLK, ep00wire) is 
+	clocked : process(SYSCLK) is
+	begin
+		if rising_edge(SYSCLK) then
+			pr_state <= nx_state;
+			
+			sclk <= sclk_r; ioupdate <= ioupdate_r;
+			sdio <= sdio_r; csb <= csb_r;
+			led <= led_r;
+	
+			ready <= ready_r;
+			current_dds <= current_dds_r;
+			data <= data_r; data_set <= data_set_r;
+			counter <= counter_r; iocycle <= iocycle_r;
+		end if;
+	end process;
+	
+	comb : process (pr_state,
+							sclk, sdio, ioupdate, csb, led,
+							ready, current_dds, data,
+							counter, iocycle, data_set,
+							ep00wire, ep01wire, ep02wire) is
+		variable dds_index : integer range 0 to 2 := 0;
+		variable csr_data : std_logic_vector (7 downto 0);
+		variable fr1_data : std_logic_vector (23 downto 0);
+		variable cftw0_data : std_logic_vector (31 downto 0);
+	begin 
+		nx_state <= pr_state;
+		
+		sclk_r <= sclk; ioupdate_r <= ioupdate;
+		sdio_r <= sdio; csb_r <= csb;
+		led_r <= led;
+		
+		ready_r <= ready;
+		current_dds_r <= current_dds;
+		data_r <= data; data_set_r <= data_set;
+		counter_r <= counter; iocycle_r <= iocycle;
 
-	type state_type is (idle, load, writing, updating);
-	variable state : state_type := idle;
-	variable Ready : STD_LOGIC := '1';
-	
-	variable CurrentDDS : integer range 0 to 2 := 0;
-	
-	variable DATASET : std_logic := '0';
-	variable nbit : integer range -1 to 87 := 87;
-	variable IOCYCLE : integer range 0 to 40 := 40;
-	
-	variable DATA : std_logic_vector (87 downto 0);
-	variable CSR_DATA : std_logic_vector (7 downto 0);
-	variable FR1_DATA : std_logic_vector (23 downto 0);
-	variable CFTW0_DATA : std_logic_vector (31 downto 0);
-	
-	constant CSR : std_logic_vector (7 downto 0) := "00000000";
-	constant FR1 : std_logic_vector (7 downto 0) := "00000001";
-	constant CFTW0 : std_logic_vector (7 downto 0) := "00000100";
-
-begin 
-
-	if rising_edge(SYSCLK) then 
-		case state is 
+		case pr_state is 
 			when idle => 
 				if ep00wire(1 downto 0) = "00" then
-					Ready := '1'; 
-					LED <= "11111111";
+					ready_r <= '1'; 
+					led_r <= "11111111";
 				else
-					if Ready = '1' then
-						Ready := '0';
-						state := load;
-						CurrentDDS := to_integer(unsigned(ep00wire(1 downto 0))) - 1;
-						LED(CurrentDDS) <= '0';
+					if ready = '1' then
+						ready_r <= '0';
+						nx_state <= load;
+						dds_index := to_integer(unsigned(ep00wire(1 downto 0))) - 1;
+						
+						current_dds_r <= dds_index;
+						LED_r(dds_index) <= '0';
 				
-						FR1_DATA := ep00wire(2) & ep00wire(7 downto 3) & "00" & "00000000" & "00000000";
-						CSR_DATA := ep00wire(15 downto 8);
-						CFTW0_DATA := ep02wire & ep01wire;
-						Data := CSR & CSR_DATA & FR1 & FR1_DATA & CFTW0 & CFTW0_DATA;
+						fr1_data := ep00wire(2) & ep00wire(7 downto 3) & "00" & "00000000" & "00000000";
+						csr_data := ep00wire(15 downto 8);
+						cftw0_data := ep02wire & ep01wire;
+						data_r <= CSR & CSR_DATA & FR1 & FR1_DATA & CFTW0 & CFTW0_DATA;
 					end if;
 				end if; 
-				
 			when load =>
-				CSB(CurrentDDS) <= '0';
-				state := writing;
-			
+				csb_r(current_dds) <= '0';
+				nx_state <= writing;
 			when writing =>
-				
-				if nbit > -1 then 
-					if DATASET = '1' then 
-						SCLK(CurrentDDS) <= '1';
-						DATASET := '0';
-						nbit := nbit - 1;
-					elsif DATASET = '0' then 
-						SCLK(CurrentDDS) <= '0';
-						SDIO(CurrentDDS) <= Data(nbit);
-						DATASET := '1';
+				if counter > -1 then 
+					if data_set = '1' then 
+						sclk_r(current_dds) <= '1';
+						data_set_r <= '0';
+						counter_r <= counter - 1;
+					elsif data_set = '0' then 
+						sclk_r(current_dds) <= '0';
+						sdio_r(current_dds) <= data(counter);
+						data_set_r <= '1';
 					end if;
-				elsif nbit = -1 then
-					DATASET := '0';
-					SCLK(CurrentDDS) <= '0';
-					nbit := 87;
-					state := updating;
+				elsif counter = -1 then
+					data_set_r <= '0';
+					sclk_r(current_dds) <= '0';
+					counter_r <= 87;
+					nx_state <= updating;
 				end if;
-				
 			when updating =>
-				CSB(CurrentDDS) <= '1';
-				if IOCYCLE > 0 then
-					IOUPDATE(CurrentDDS) <= '1';
-					IOCYCLE := IOCYCLE -1;
+				csb_r(current_dds) <= '1';
+				if iocycle > 0 then
+					ioupdate_r(current_dds) <= '1';
+					iocycle_r <= IOCYCLE -1;
 				else
-					IOUPDATE(CurrentDDS) <= '0';
-					IOCYCLE := 40;
-					state := idle;
+					ioupdate_r(current_dds) <= '0';
+					iocycle_r <= 40;
+					nx_state <= idle;
 				end if;
-			
 			when others => 
-				null;
-			
+				null;			
 		end case;
-	end if;
+	end process; 
 
-end process; 
+
+--process (SYSCLK, ep00wire) is 
+--
+--	type state_type is (idle, load, writing, updating);
+--	variable state : state_type := idle;
+--	variable Ready : STD_LOGIC := '1';
+--	
+--	variable CurrentDDS : integer range 0 to 2 := 0;
+--	
+--	variable DATASET : std_logic := '0';
+--	variable nbit : integer range -1 to 87 := 87;
+--	variable IOCYCLE : integer range 0 to 40 := 40;
+--	
+--	variable DATA : std_logic_vector (87 downto 0);
+--	variable CSR_DATA : std_logic_vector (7 downto 0);
+--	variable FR1_DATA : std_logic_vector (23 downto 0);
+--	variable CFTW0_DATA : std_logic_vector (31 downto 0);
+--	
+--	constant CSR : std_logic_vector (7 downto 0) := "00000000";
+--	constant FR1 : std_logic_vector (7 downto 0) := "00000001";
+--	constant CFTW0 : std_logic_vector (7 downto 0) := "00000100";
+--
+--begin 
+--
+--	if rising_edge(SYSCLK) then 
+--		case state is 
+--			when idle => 
+--				if ep00wire(1 downto 0) = "00" then
+--					Ready := '1'; 
+--					LED <= "11111111";
+--				else
+--					if Ready = '1' then
+--						Ready := '0';
+--						state := load;
+--						CurrentDDS := to_integer(unsigned(ep00wire(1 downto 0))) - 1;
+--						LED(CurrentDDS) <= '0';
+--				
+--						FR1_DATA := ep00wire(2) & ep00wire(7 downto 3) & "00" & "00000000" & "00000000";
+--						CSR_DATA := ep00wire(15 downto 8);
+--						CFTW0_DATA := ep02wire & ep01wire;
+--						Data := CSR & CSR_DATA & FR1 & FR1_DATA & CFTW0 & CFTW0_DATA;
+--					end if;
+--				end if; 
+--				
+--			when load =>
+--				CSB(CurrentDDS) <= '0';
+--				state := writing;
+--			
+--			when writing =>
+--				
+--				if nbit > -1 then 
+--					if DATASET = '1' then 
+--						SCLK(CurrentDDS) <= '1';
+--						DATASET := '0';
+--						nbit := nbit - 1;
+--					elsif DATASET = '0' then 
+--						SCLK(CurrentDDS) <= '0';
+--						SDIO(CurrentDDS) <= Data(nbit);
+--						DATASET := '1';
+--					end if;
+--				elsif nbit = -1 then
+--					DATASET := '0';
+--					SCLK(CurrentDDS) <= '0';
+--					nbit := 87;
+--					state := updating;
+--				end if;
+--				
+--			when updating =>
+--				CSB(CurrentDDS) <= '1';
+--				if IOCYCLE > 0 then
+--					IOUPDATE(CurrentDDS) <= '1';
+--					IOCYCLE := IOCYCLE -1;
+--				else
+--					IOUPDATE(CurrentDDS) <= '0';
+--					IOCYCLE := 40;
+--					state := idle;
+--				end if;
+--			
+--			when others => 
+--				null;
+--			
+--		end case;
+--	end if;
+--
+--end process; 
 
 
 -- Instantiate the okHost and connect endpoints
@@ -248,7 +355,12 @@ ep02 : okWireIn  port map (ok1=>ok1, ep_addr=>x"02", ep_dataout=>ep02wire_unsync
 		d => ep02wire_unsync,
 		q => ep02wire
 	);
-		
 	
+   BUFG_inst : BUFG
+   port map (
+      O => SYSCLK, -- 1-bit output: Clock buffer output
+      I => CLK10  -- 1-bit input: Clock buffer input
+   );
+		
 end Behavioral;
 
