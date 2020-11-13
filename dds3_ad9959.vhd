@@ -64,10 +64,27 @@ architecture Behavioral of dds3_ad9959 is
 	signal ep00wire : std_logic_vector(15 downto 0);
 	signal ep01wire : std_logic_vector(15 downto 0);
 	signal ep02wire : std_logic_vector(15 downto 0);
+	
+	-- before synchronizer for clock domain crossing
+	signal ep00wire_unsync : std_logic_vector(15 downto 0);
+	signal ep01wire_unsync : std_logic_vector(15 downto 0);
+	signal ep02wire_unsync : std_logic_vector(15 downto 0);
 
 	signal SYSCLK : std_logic;
 	signal SCLK : std_logic_vector(2 downto 0);
 	signal sclk_inv : std_logic_vector(2 downto 0);
+	
+	component synchronizer is
+	generic (
+		N_BITS : integer
+	);
+	port (
+		clk	: in std_logic;
+		rst	: in std_logic;
+		d		: in std_logic_vector(N_BITS - 1 downto 0);
+		q		: out std_logic_vector(N_BITS - 1 downto 0) := (others => '0')
+	);
+	end component;
 
 begin
 
@@ -168,9 +185,9 @@ end process;
 -- Instantiate the okHost and connect endpoints
 okHI : okHost port map (hi_in=>hi_in, hi_out=>hi_out, hi_inout=>hi_inout, ti_clk=>ti_clk, ok1=>ok1, ok2=>ok2);
 okWO : okWireOR  generic map (N=>2) port map (ok2=>ok2, ok2s=>ok2s);
-ep00 : okWireIn  port map (ok1=>ok1, ep_addr=>x"00", ep_dataout=>ep00wire);
-ep01 : okWireIn  port map (ok1=>ok1, ep_addr=>x"01", ep_dataout=>ep01wire);
-ep02 : okWireIn  port map (ok1=>ok1, ep_addr=>x"02", ep_dataout=>ep02wire);
+ep00 : okWireIn  port map (ok1=>ok1, ep_addr=>x"00", ep_dataout=>ep00wire_unsync);
+ep01 : okWireIn  port map (ok1=>ok1, ep_addr=>x"01", ep_dataout=>ep01wire_unsync);
+ep02 : okWireIn  port map (ok1=>ok1, ep_addr=>x"02", ep_dataout=>ep02wire_unsync);
 
 --ep03 : okWireIn  port map (ok1=>ok1,                                ep_addr=>x"03", ep_dataout=>ep03wire);
 --ep04 : okWireIn  port map (ok1=>ok1,                                ep_addr=>x"04", ep_dataout=>ep04wire);
@@ -198,6 +215,39 @@ ep02 : okWireIn  port map (ok1=>ok1, ep_addr=>x"02", ep_dataout=>ep02wire);
 			S => '0'     -- 1-bit set input
 		);
 	end generate GEN_ODDR2;
+	
+	sync_00 : synchronizer
+	generic map (
+		N_BITS => 16
+	)
+	port map (
+		clk => SYSCLK,
+		rst => '0',
+		d => ep00wire_unsync,
+		q => ep00wire
+	);
+	
+	sync_01 : synchronizer
+	generic map (
+		N_BITS => 16
+	)
+	port map (
+		clk => SYSCLK,
+		rst => '0',
+		d => ep01wire_unsync,
+		q => ep01wire
+	);
+	
+	sync_02 : synchronizer
+	generic map (
+		N_BITS => 16
+	)
+	port map (
+		clk => SYSCLK,
+		rst => '0',
+		d => ep02wire_unsync,
+		q => ep02wire
+	);
 		
 	
 end Behavioral;
