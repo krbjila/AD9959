@@ -45,8 +45,7 @@ entity dds3_ad9959 is
 	 
 				CLK10 : in  STD_LOGIC; --10 MHz from OK VCO
 			  
-				
-				SCLK, IOUPDATE, SDIO : out  STD_LOGIC_VECTOR(2 downto 0);
+				sclk_out, IOUPDATE, SDIO : out  STD_LOGIC_VECTOR(2 downto 0);
 				CSB : out STD_LOGIC_VECTOR(2 downto 0) := "111";
 				LED : out STD_LOGIC_VECTOR(7 downto 0) := "11111111"
 				);
@@ -66,7 +65,9 @@ architecture Behavioral of dds3_ad9959 is
 	signal ep01wire : std_logic_vector(15 downto 0);
 	signal ep02wire : std_logic_vector(15 downto 0);
 
-	signal SYSCLK : std_logic;	
+	signal SYSCLK : std_logic;
+	signal SCLK : std_logic_vector(2 downto 0);
+	signal sclk_inv : std_logic_vector(2 downto 0);
 
 begin
 
@@ -76,6 +77,7 @@ begin
       I => CLK10  -- 1-bit input: Clock buffer input
    );
 
+	sclk_inv <= not sclk;
 	
 process (SYSCLK, ep00wire) is 
 
@@ -179,5 +181,24 @@ ep02 : okWireIn  port map (ok1=>ok1, ep_addr=>x"02", ep_dataout=>ep02wire);
 --ep20 : okWireOut port map (ok1=>ok1, ok2=>ok2s(1*17-1 downto 0*17), ep_addr=>x"20", ep_datain=>ep20wire);
 --ep80 : okPipeIn  port map (ok1=>ok1, ok2=>ok2s(2*17-1 downto 1*17), ep_addr=>x"80", ep_dataout=>ep80pipe, ep_write=>ep80write);
 
+	GEN_ODDR2: for I in 0 to 2 generate
+		ODDR2_clkout_0 : ODDR2
+		generic map(
+			DDR_ALIGNMENT => "NONE", -- Sets output alignment to "NONE", "C0", "C1" 
+			INIT => '0', -- Sets initial state of the Q output to '0' or '1'
+			SRTYPE => "SYNC") -- Specifies "SYNC" or "ASYNC" set/reset
+		port map (
+			Q => sclk_out(I), -- 1-bit output data
+			C0 => sclk(I), -- 1-bit clock input
+			C1 => sclk_inv(I), -- 1-bit clock input
+			CE => '1',  -- 1-bit clock enable input
+			D0 => '0',   -- 1-bit data input (associated with C0)
+			D1 => '1',   -- 1-bit data input (associated with C1)
+			R => '0',    -- 1-bit reset input
+			S => '0'     -- 1-bit set input
+		);
+	end generate GEN_ODDR2;
+		
+	
 end Behavioral;
 

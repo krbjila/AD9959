@@ -69,9 +69,9 @@ NET "CLK10" CLOCK_DEDICATED_ROUTE = FALSE;
 ## DDS Data
 ############################################################################
 
-NET "SCLK<0>"     LOC="E16" | IOSTANDARD="LVCMOS33";
-NET "SCLK<1>"     LOC="C3" | IOSTANDARD="LVCMOS33";
-NET "SCLK<2>"     LOC="K3" | IOSTANDARD="LVCMOS33";
+NET "sclk_out<0>"     LOC="E16" | IOSTANDARD="LVCMOS33";
+NET "sclk_out<1>"     LOC="C3" | IOSTANDARD="LVCMOS33";
+NET "sclk_out<2>"     LOC="K3" | IOSTANDARD="LVCMOS33";
 
 NET "IOUPDATE<0>"     LOC="G16" | IOSTANDARD="LVCMOS33";
 NET "IOUPDATE<1>"     LOC="D1" | IOSTANDARD="LVCMOS33";
