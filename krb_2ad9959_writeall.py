@@ -8,18 +8,18 @@
 """
 
 channels = [
-	{'name' : 'Up Leg Double Pass', 'address' : [0,0],  'frequency' : 71.35},
-	{'name' : 'Up Leg Experiment', 'address' : [0,1],  'frequency' : 73.0},
-	{'name' : 'Down Leg After Cavity', 'address' : [0,2],  'frequency' : 78.6},
-	{'name' : 'Down Leg Experiment', 'address' : [0,3],  'frequency' : 76.6},
-	{'name' : 'dds1-0', 'address' : [1,0],  'frequency' : 0},
-	{'name' : 'dds1-1', 'address' : [1,1],  'frequency' : 0},
-	{'name' : 'dds1-2', 'address' : [1,2],  'frequency' : 0},
-	{'name' : 'dds1-3', 'address' : [1,3],  'frequency' : 0},
-	{'name' : 'dds0-0', 'address' : [2,0],  'frequency' : 0},
-	{'name' : 'dds0-0', 'address' : [2,1],  'frequency' : 0},
-	{'name' : 'dds0-0', 'address' : [2,2],  'frequency' : 0},
-	{'name' : 'dds0-0', 'address' : [2,3],  'frequency' : 0}
+		{'name' : 'Up Leg Double Pass', 'address' : [0,0], 'frequency' : 71.18},
+		{'name' : 'Up Leg Experiment', 'address' : [0,1], 'frequency' : 73.0},
+		{'name' : 'Down Leg After Cavity', 'address' : [0,2], 'frequency' : 78.6},
+		{'name' : 'Down Leg Experiment', 'address' : [0,3], 'frequency' : 163.82},
+		{'name' : 'Vertical Lattice', 'address' : [1,0], 'frequency' : 90.0},
+		{'name' : 'Horizontal OT', 'address' : [1,1], 'frequency' : 110.0},
+		{'name' : 'MARIA OT', 'address' : [1,2], 'frequency' : 70.0},
+		{'name' : 'Plug Beam', 'address' : [1,3], 'frequency' : 80.0},
+		{'name' : 'K D1 AOM', 'address' : [2,0], 'frequency' : 80.0},
+		{'name' : 'H. Lattice 1', 'address' : [2,1], 'frequency' : 70},
+		{'name' : 'H. Lattice 2', 'address' : [2,2], 'frequency' : 110},
+		{'name' : 'Fat Latt AKA Large Spacing Lattice', 'address' : [2,3], 'frequency' : 90.0}
 	]
 
 multiplier = 20
@@ -72,7 +72,7 @@ for k in channels:
 	fp.SetWireInValue(0x02, ep02)
 	fp.UpdateWireIns()
 
-	sleep(0.001)
+	sleep(0.1)
 
 	fp.SetWireInValue(0x00, 0)
 	fp.UpdateWireIns()
