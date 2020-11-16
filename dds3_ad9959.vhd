@@ -316,8 +316,8 @@ ep02 : okWireIn  port map (ok1=>ok1, ep_addr=>x"02", ep_dataout=>ep02wire_unsync
 			C0 => sclk(I), -- 1-bit clock input
 			C1 => sclk_inv(I), -- 1-bit clock input
 			CE => '1',  -- 1-bit clock enable input
-			D0 => '0',   -- 1-bit data input (associated with C0)
-			D1 => '1',   -- 1-bit data input (associated with C1)
+			D0 => '1',   -- 1-bit data input (associated with C0)
+			D1 => '0',   -- 1-bit data input (associated with C1)
 			R => '0',    -- 1-bit reset input
 			S => '0'     -- 1-bit set input
 		);
