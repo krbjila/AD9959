@@ -166,6 +166,7 @@ begin
 						cftw0_data := ep02wire & ep01wire;
 						data_r <= CSR & CSR_DATA & FR1 & FR1_DATA & CFTW0 & CFTW0_DATA;
 					end if;
+					sclk_r <= (others => '0');
 				end if; 
 			when load =>
 				csb_r(current_dds) <= '0';
