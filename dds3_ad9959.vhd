@@ -70,7 +70,7 @@ architecture Behavioral of dds3_ad9959 is
 	signal ep01wire_unsync : std_logic_vector(15 downto 0);
 	signal ep02wire_unsync : std_logic_vector(15 downto 0);
 
-	signal SYSCLK : std_logic;
+	signal SYSCLK, SYSCLK_DIV2 : std_logic;
 	signal SCLK : std_logic_vector(2 downto 0);
 	signal sclk_inv : std_logic_vector(2 downto 0);
 	
@@ -138,7 +138,7 @@ begin
 	begin 
 		nx_state <= pr_state;
 		
-		sclk_r <= sclk; ioupdate_r <= ioupdate;
+		sclk_r <= (others => '0'); ioupdate_r <= ioupdate;
 		sdio_r <= sdio; csb_r <= csb;
 		led_r <= led;
 		
@@ -166,7 +166,6 @@ begin
 						cftw0_data := ep02wire & ep01wire;
 						data_r <= CSR & CSR_DATA & FR1 & FR1_DATA & CFTW0 & CFTW0_DATA;
 					end if;
-					sclk_r <= (others => '0');
 				end if; 
 			when load =>
 				csb_r(current_dds) <= '0';
@@ -174,11 +173,11 @@ begin
 			when writing =>
 				if counter > -1 then 
 					if data_set = '1' then 
-						sclk_r(current_dds) <= '1';
+						sclk_r(current_dds) <= '0';
 						data_set_r <= '0';
 						counter_r <= counter - 1;
 					elsif data_set = '0' then 
-						sclk_r(current_dds) <= '0';
+						sclk_r(current_dds) <= '1';
 						sdio_r(current_dds) <= data(counter);
 						data_set_r <= '1';
 					end if;
@@ -316,7 +315,7 @@ ep02 : okWireIn  port map (ok1=>ok1, ep_addr=>x"02", ep_dataout=>ep02wire_unsync
 			Q => sclk_out(I), -- 1-bit output data
 			C0 => sclk(I), -- 1-bit clock input
 			C1 => sclk_inv(I), -- 1-bit clock input
-			CE => '1',  -- 1-bit clock enable input
+			CE => sclk(I),  -- 1-bit clock enable input
 			D0 => '0',   -- 1-bit data input (associated with C0)
 			D1 => '1',   -- 1-bit data input (associated with C1)
 			R => '0',    -- 1-bit reset input
