@@ -186,6 +186,7 @@ begin
 				csb_r(current_dds) <= '0';
 				nx_state <= writing;
 			when writing =>
+				csb_r(current_dds) <= '0';
 				if counter > -1 then
 					ce_r(current_dds) <= '1';
 					sdio_r(current_dds) <= data(counter);
